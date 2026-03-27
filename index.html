@@ -14,7 +14,7 @@
     
     <style>
         :root {
-            --primary-color: #1b4332; /* Vert foncé forêt */
+            --primary-color: #1b4332;
             --accent-color: #2d6a4f;
             --bg-light: #f8f9fa;
         }
@@ -33,7 +33,6 @@
             z-index: 1;
         }
 
-        /* Panneau de contrôle / Légende */
         #custom-legend {
             position: absolute;
             top: 15px;
@@ -59,7 +58,6 @@
             margin: 0;
             font-size: 1.1rem;
             color: var(--primary-color);
-            letter-spacing: 0.5px;
         }
 
         .category-block {
@@ -73,15 +71,6 @@
             padding: 6px 10px;
             display: flex;
             align-items: center;
-            user-select: none;
-        }
-
-        .category-title-container {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            margin-left: 8px;
         }
 
         .category-title {
@@ -89,28 +78,14 @@
             text-transform: uppercase;
             font-size: 0.7rem;
             color: #95a5a6;
-        }
-
-        .category-content {
-            padding: 5px;
+            margin-left: 8px;
         }
 
         .layer-item {
             display: flex;
             align-items: center;
-            margin-bottom: 4px;
-            cursor: pointer;
-            padding: 4px 6px;
-            border-radius: 4px;
+            padding: 4px 10px;
             font-size: 0.85rem;
-        }
-
-        .layer-item:hover {
-            background: #f0f4f8;
-        }
-
-        .layer-item input {
-            margin-right: 8px;
         }
 
         .symbol {
@@ -119,10 +94,8 @@
             margin-right: 8px;
             border-radius: 3px;
             display: inline-block;
-            flex-shrink: 0;
         }
 
-        /* Boutons de contrôle basemap */
         .map-controls-left {
             position: absolute;
             bottom: 25px;
@@ -141,30 +114,14 @@
             border: 1px solid #ddd;
             cursor: pointer;
             font-size: 0.85rem;
-            font-weight: 500;
             color: var(--primary-color);
-            transition: all 0.2s;
-            text-align: center;
         }
 
-        .custom-button:hover {
-            background: #f8f9fa;
-        }
-
-        /* Styles des popups */
         .popup-photo {
             width: 100%;
             height: auto;
             border-radius: 4px;
             margin-top: 8px;
-        }
-
-        .leaflet-popup-content-wrapper { border-radius: 8px; }
-        .leaflet-popup-content { width: 300px !important; line-height: 1.4; }
-
-        @media (max-width: 700px) {
-            #custom-legend { width: 220px; }
-            .leaflet-popup-content { width: 240px !important; }
         }
     </style>
 </head>
@@ -174,9 +131,7 @@
         <div class="legend-header">
             <h2>Végétation & Espaces</h2>
         </div>
-        <div id="legend-container">
-            <!-- La légende sera générée ici -->
-        </div>
+        <div id="legend-container"></div>
     </div>
 
     <div class="map-controls-left">
@@ -188,22 +143,18 @@
     <div id="map"></div>
 
     <script>
-        // Définition de la projection Lambert 93 / CC45 (EPSG:3945)
+        // Lambert 93 / CC45 (EPSG:3945)
         proj4.defs("EPSG:3945","+proj=lcc +lat_1=44.25 +lat_2=45.75 +lat_0=45 +lon_0=3 +x_0=1700000 +y_0=4200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
 
-        // Initialisation de la carte sur Le Taillan-Médoc
         const map = L.map('map', { zoomControl: false }).setView([44.905, -0.671], 14);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Fonds de carte
         const voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; CARTO',
-            maxZoom: 20
+            attribution: '&copy; CARTO'
         }).addTo(map);
 
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Esri',
-            maxZoom: 19
+            attribution: 'Esri'
         });
 
         let isSatellite = false;
@@ -222,11 +173,9 @@
 
         const layers = {};
         const categories = {
-            vegetation: { title: "Couvert Végétal", contentId: "cat-veg" },
-            contexte: { title: "Données de base", contentId: "cat-ctx" }
+            vegetation: { title: "Couvert Végétal", contentId: "cat-veg" }
         };
 
-        // Configuration de la couche demandée
         const layerConfigs = [
             { 
                 id: 'vegetation_main', 
@@ -234,54 +183,48 @@
                 name: 'Végétation (Diagnostic)', 
                 category: 'vegetation', 
                 color: '#2d6a4f', 
-                weight: 2, 
+                weight: 3, 
                 fillOpacity: 0.6 
             }
         ];
 
-        // Fonction pour gérer les popups et le zoom
         function onEachFeature(feature, layer) {
-            let content = '<div class="p-2"><strong>Détails de l\'élément</strong><ul class="text-xs mt-2 list-none p-0">';
-            
+            let content = '<div class="p-2"><strong>Détails</strong><ul style="font-size:11px; margin-top:5px; padding:0; list-style:none;">';
             for (let key in feature.properties) {
                 if (feature.properties[key] && key !== 'photo') {
-                    content += `<li><span class="text-gray-500">${key}:</span> ${feature.properties[key]}</li>`;
+                    content += `<li><span style="color:#888">${key}:</span> ${feature.properties[key]}</li>`;
                 }
             }
-            
-            if (feature.properties.photo) {
-                content += `<br><img src="${feature.properties.photo}" class="popup-photo" alt="Photo" onerror="this.style.display='none'">`;
+            if (feature.properties.photo || feature.properties.Photo) {
+                content += `<img src="${feature.properties.photo || feature.properties.Photo}" class="popup-photo">`;
             }
-            
             content += '</ul></div>';
             layer.bindPopup(content);
         }
 
-        // Fonction de chargement avec gestion des projections
         async function loadGeoLayer(config) {
             try {
+                console.log("Chargement de :", config.url);
                 const response = await fetch(config.url);
                 if (!response.ok) throw new Error("Fichier introuvable");
-                const data = await response.json();
                 
-                // Détection si les données utilisent EPSG:3945
-                const isProjected = (data.crs && JSON.stringify(data.crs).includes('3945'));
+                const data = await response.json();
+                console.log("Données chargées pour " + config.id, data);
 
                 const layer = L.geoJSON(data, {
                     coordsToLatLng: (coords) => {
-                        // Si X > 1000, c'est probablement du Lambert/CC45 (mètres)
-                        if (isProjected || coords[0] > 1000) {
-                            var pt = proj4("EPSG:3945", "EPSG:4326", [coords[0], coords[1]]);
-                            return new L.LatLng(pt[1], pt[0]);
+                        // Si X > 100 000, c'est du Lambert CC45
+                        if (coords[0] > 100000) {
+                            const pt = proj4("EPSG:3945", "EPSG:4326", [coords[0], coords[1]]);
+                            return [pt[1], pt[0]]; // Leaflet attend [lat, lng]
                         }
-                        return new L.LatLng(coords[1], coords[0]);
+                        return [coords[1], coords[0]];
                     },
-                    style: (f) => ({
+                    style: () => ({
                         color: config.color,
                         weight: config.weight,
-                        opacity: 0.9,
                         fillColor: config.color,
-                        fillOpacity: config.fillOpacity || 0.2
+                        fillOpacity: config.fillOpacity
                     }),
                     pointToLayer: (f, latlng) => L.circleMarker(latlng, {
                         radius: 8,
@@ -296,12 +239,18 @@
                 layers[config.id] = layer;
                 layer.addTo(map);
                 addLayerToUI(config);
-                
-                // Optionnel : zoomer sur la couche au chargement
-                // map.fitBounds(layer.getBounds());
+
+                // FOCUS AUTOMATIQUE SUR LES DONNÉES
+                const bounds = layer.getBounds();
+                if (bounds.isValid()) {
+                    console.log("Zoom sur les données...");
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                } else {
+                    console.warn("Les limites de la couche ne sont pas valides.");
+                }
 
             } catch (e) {
-                console.warn("Erreur de chargement pour " + config.url, e);
+                console.error("Erreur critique sur " + config.url, e);
             }
         }
 
@@ -314,24 +263,10 @@
                 block.innerHTML = `
                     <div class="category-header">
                         <input type="checkbox" checked id="master-${key}">
-                        <div class="category-title-container" id="title-container-${key}">
-                            <span class="category-title">${cat.title}</span>
-                        </div>
+                        <span class="category-title">${cat.title}</span>
                     </div>
                     <div class="category-content" id="${cat.contentId}"></div>
                 `;
-                
-                // Toggle pour masquer/afficher toute la catégorie
-                block.querySelector(`#master-${key}`).onchange = (e) => {
-                    const checked = e.target.checked;
-                    block.querySelectorAll('.layer-item input').forEach(input => {
-                        if (input.checked !== checked) {
-                            input.checked = checked;
-                            input.dispatchEvent(new Event('change'));
-                        }
-                    });
-                };
-                
                 container.appendChild(block);
             });
         }
@@ -342,20 +277,15 @@
             div.className = 'layer-item';
             div.innerHTML = `
                 <input type="checkbox" id="chk-${config.id}" checked>
-                <label for="chk-${config.id}" style="display:flex; align-items:center; width:100%">
+                <label for="chk-${config.id}" style="display:flex; align-items:center; cursor:pointer">
                     <span class="symbol" style="background:${config.color}"></span>
                     ${config.name}
                 </label>
             `;
-            
             div.querySelector('input').onchange = (e) => {
-                if (e.target.checked) { 
-                    if (layers[config.id]) map.addLayer(layers[config.id]); 
-                } else { 
-                    if (layers[config.id]) map.removeLayer(layers[config.id]); 
-                }
+                if (e.target.checked) map.addLayer(layers[config.id]);
+                else map.removeLayer(layers[config.id]);
             };
-            
             container.appendChild(div);
         }
 
