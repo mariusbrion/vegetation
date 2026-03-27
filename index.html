@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Proj4js pour la gestion des projections (EPSG:3945) -->
+    <!-- Proj4js pour la gestion des projections -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
     
     <style>
@@ -143,8 +143,11 @@
     <div id="map"></div>
 
     <script>
-        // Lambert 93 / CC45 (EPSG:3945)
-        proj4.defs("EPSG:3945","+proj=lcc +lat_1=44.25 +lat_2=45.75 +lat_0=45 +lon_0=3 +x_0=1700000 +y_0=4200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+        // Définition des projections possibles
+        // EPSG:3945 (Lambert CC45)
+        proj4.defs("EPSG:3945","+proj=lcc +lat_1=44.25 +lat_2=45.75 +lat_0=45 +lon_0=3 +x_0=1700000 +y_0=4200000 +ellps=GRS80 +units=m +no_defs");
+        // EPSG:3857 (Web Mercator - celui de votre fichier)
+        proj4.defs("EPSG:3857","+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs");
 
         const map = L.map('map', { zoomControl: false }).setView([44.905, -0.671], 14);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -209,16 +212,27 @@
                 if (!response.ok) throw new Error("Fichier introuvable");
                 
                 const data = await response.json();
-                console.log("Données chargées pour " + config.id, data);
+                console.log("Données chargées :", data);
 
                 const layer = L.geoJSON(data, {
                     coordsToLatLng: (coords) => {
-                        // Si X > 100 000, c'est du Lambert CC45
-                        if (coords[0] > 100000) {
-                            const pt = proj4("EPSG:3945", "EPSG:4326", [coords[0], coords[1]]);
-                            return [pt[1], pt[0]]; // Leaflet attend [lat, lng]
+                        const x = coords[0];
+                        const y = coords[1];
+
+                        // DÉTECTION DE LA PROJECTION
+                        // Si Y est énorme (> 5 000 000), c'est du Web Mercator (3857) comme votre fichier
+                        if (y > 5000000) {
+                            const pt = proj4("EPSG:3857", "EPSG:4326", [x, y]);
+                            return [pt[1], pt[0]];
+                        } 
+                        // Si X est autour de 1 700 000, c'est du Lambert CC45 (3945)
+                        else if (x > 1000000) {
+                            const pt = proj4("EPSG:3945", "EPSG:4326", [x, y]);
+                            return [pt[1], pt[0]];
                         }
-                        return [coords[1], coords[0]];
+                        
+                        // Sinon on garde tel quel (WGS84)
+                        return [y, x];
                     },
                     style: () => ({
                         color: config.color,
@@ -240,17 +254,13 @@
                 layer.addTo(map);
                 addLayerToUI(config);
 
-                // FOCUS AUTOMATIQUE SUR LES DONNÉES
                 const bounds = layer.getBounds();
                 if (bounds.isValid()) {
-                    console.log("Zoom sur les données...");
                     map.fitBounds(bounds, { padding: [50, 50] });
-                } else {
-                    console.warn("Les limites de la couche ne sont pas valides.");
                 }
 
             } catch (e) {
-                console.error("Erreur critique sur " + config.url, e);
+                console.error("Erreur sur " + config.url, e);
             }
         }
 
